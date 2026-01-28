@@ -85,7 +85,6 @@ function App() {
           const posNode = s["aixm:location"]?.["aixm:Point"]?.["gml:pos"];
           if (!posNode) return;
 
-          point["@_gml:id"] = "uuid." + generateUUID();
           const [lat, lon] = (posNode.__text || posNode).trim().split(" ").map(parseFloat);
 
           previews.push({
@@ -98,6 +97,57 @@ function App() {
     });
 
     return previews;
+  };
+
+  // --------------------
+  // Costruisce un AIXM 5.1 con solo i waypoint
+  // --------------------
+  const buildWaypointOnlyAIXM = (json) => {
+    const root = json["message:AIXMBasicMessage"];
+    if (!root) return null;
+
+    const membersRaw = root["message:hasMember"];
+    if (!membersRaw) return null;
+
+    const membersArray = Array.isArray(membersRaw) ? membersRaw : [membersRaw];
+
+    const waypointMembers = membersArray
+      .map((m) => {
+        const dpRaw = m["aixm:DesignatedPoint"];
+        if (!dpRaw) return null;
+
+        const dpArray = Array.isArray(dpRaw) ? dpRaw : [dpRaw];
+        const dpFiltered = dpArray
+          .map((point) => {
+            const timeSlices = point["aixm:timeSlice"]?.["aixm:DesignatedPointTimeSlice"];
+            if (!timeSlices) return null;
+
+            const sliceArray = Array.isArray(timeSlices) ? timeSlices : [timeSlices];
+            const validSlices = sliceArray.filter(
+              (s) => s["aixm:location"]?.["aixm:Point"]?.["gml:pos"]?.trim() !== ""
+            );
+
+            if (validSlices.length === 0) return null;
+
+            return {
+              ...point,
+              "@_gml:id": "uuid." + generateUUID(),
+              "aixm:timeSlice": { "aixm:DesignatedPointTimeSlice": validSlices },
+            };
+          })
+          .filter(Boolean);
+
+        if (dpFiltered.length === 0) return null;
+        return { "aixm:DesignatedPoint": dpFiltered };
+      })
+      .filter(Boolean);
+
+    return {
+      "message:AIXMBasicMessage": {
+        ...root,
+        "message:hasMember": waypointMembers,
+      },
+    };
   };
 
   // --------------------
@@ -125,7 +175,6 @@ function App() {
       setXmlJson(json);
       setIsDummy(false);
 
-      // ✅ Fit view sulla zona dei waypoint importati
       setTimeout(() => {
         if (!mapRef.current) return;
         const bounds = L.latLngBounds(previews.map((p) => [p.lat, p.lon]));
@@ -153,18 +202,49 @@ function App() {
   };
 
   // --------------------
-  // Download XML completo senza filtri
+  // Download XML waypoint solo
   // --------------------
   const handleDownloadWaypoints = () => {
     if (!xmlFile || !xmlJson) return alert("Carica prima un file XML!");
+
+    const newXmlJson = buildWaypointOnlyAIXM(xmlJson);
+    if (!newXmlJson) return alert("Nessun waypoint trovato!");
+
     const builder = new XMLBuilder({ ignoreAttributes: false, format: true, suppressEmptyNode: true });
-    const newXml = builder.build(xmlJson);
+    const newXml = builder.build(newXmlJson);
+
     const originalName = xmlFile.name.replace(/\.xml$/i, "");
     const blob = new Blob([newXml], { type: "application/xml" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `${originalName}_waypoint.xml`;
+    link.download = `${originalName}_waypoints_only.xml`;
     link.click();
+  };
+
+  // --------------------
+  // Download CSV
+  // --------------------
+  const handleDownloadCSV = () => {
+    if (!waypoints || waypoints.length === 0) return alert("Nessun waypoint disponibile per l'estrazione CSV!");
+
+    const headers = ["Designator", "Lat", "Lon", "Lat DMS", "Lon DMS"];
+    const rows = waypoints.map((wp) => [
+      wp._preview.designator,
+      wp._preview.lat,
+      wp._preview.lon,
+      toDMSLabel(wp._preview.lat, true),
+      toDMSLabel(wp._preview.lon, false),
+    ]);
+
+    const csvContent = [headers, ...rows].map((e) => e.join(",")).join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.download = "waypoints.csv";
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   // --------------------
@@ -174,15 +254,12 @@ function App() {
     wp._preview.designator.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Aggiorna visibilità dei waypoint sulla mappa in base alla search
   useEffect(() => {
     const newVisible = new Set(filteredWaypoints.map((_, i) => i));
     setVisible(newVisible);
   }, [searchTerm, waypoints]);
 
-  // --------------------
-  // Fit bounds automatico quando cambiano i waypoint visibili
-  // --------------------
+  // Fit bounds automatico
   useEffect(() => {
     if (!mapRef.current || visible.size === 0) return;
 
@@ -196,51 +273,12 @@ function App() {
     if (bounds.isValid()) mapRef.current.fitBounds(bounds, { padding: [40, 40] });
   }, [waypoints, visible]);
 
-  // --------------------
   // Fix Leaflet resize
-  // --------------------
   useEffect(() => {
     const handleResize = () => mapRef.current?.invalidateSize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  // --------------------
-// Download CSV completo
-// --------------------
-const handleDownloadCSV = () => {
-  if (!waypoints || waypoints.length === 0) {
-    return alert("Nessun waypoint disponibile per l'estrazione CSV!");
-  }
-
-  // Intestazioni colonne
-  const headers = ["Designator", "Lat", "Lon", "Lat DMS", "Lon DMS"];
-
-  // Riga dei dati
-  const rows = waypoints.map((wp) => [
-    wp._preview.designator,
-    wp._preview.lat,
-    wp._preview.lon,
-    toDMSLabel(wp._preview.lat, true),
-    toDMSLabel(wp._preview.lon, false),
-  ]);
-
-  // Unisci intestazioni e righe
-  const csvContent =
-    [headers, ...rows]
-      .map((e) => e.join(",")) // separatore CSV
-      .join("\n");
-
-  // Creazione blob e download
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const link = document.createElement("a");
-  const url = URL.createObjectURL(blob);
-  link.href = url;
-  link.download = "waypoints.csv";
-  link.click();
-  URL.revokeObjectURL(url);
-};
-
 
   return (
     <div className="app-container">
@@ -258,8 +296,6 @@ const handleDownloadCSV = () => {
             Waypoint {isDummy ? "di esempio" : "estratti"} ({waypoints.length})
           </h2>
 
-
-          {/* Search bar */}
           <input
             type="text"
             placeholder="Cerca waypoint..."
