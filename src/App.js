@@ -258,6 +258,7 @@ const handleDownloadCSV = () => {
             Waypoint {isDummy ? "di esempio" : "estratti"} ({waypoints.length})
           </h2>
 
+
           {/* Search bar */}
           <input
             type="text"
