@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/aixm-waypoints/static/css/main.428bde75.css",
-    "main.js": "/aixm-waypoints/static/js/main.cd26c26b.js",
+    "main.css": "/aixm-waypoints/static/css/main.e3cf4bcb.css",
+    "main.js": "/aixm-waypoints/static/js/main.28f1fedb.js",
     "static/js/453.95fbe8bb.chunk.js": "/aixm-waypoints/static/js/453.95fbe8bb.chunk.js",
     "index.html": "/aixm-waypoints/index.html",
-    "main.428bde75.css.map": "/aixm-waypoints/static/css/main.428bde75.css.map",
-    "main.cd26c26b.js.map": "/aixm-waypoints/static/js/main.cd26c26b.js.map",
+    "main.e3cf4bcb.css.map": "/aixm-waypoints/static/css/main.e3cf4bcb.css.map",
+    "main.28f1fedb.js.map": "/aixm-waypoints/static/js/main.28f1fedb.js.map",
     "453.95fbe8bb.chunk.js.map": "/aixm-waypoints/static/js/453.95fbe8bb.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.428bde75.css",
-    "static/js/main.cd26c26b.js"
+    "static/css/main.e3cf4bcb.css",
+    "static/js/main.28f1fedb.js"
   ]
 }
