@@ -91,10 +91,10 @@ body {
 ------------------------------ */
 .waypoint-map-container {
   display: grid;
-  grid-template-columns: 400px 1fr;
-  gap: 20px;
-  height: calc(100vh - 180px);
-  min-height: 500px;
+  grid-template-columns: 380px 1fr;
+  gap: 14px;
+  height: 600px;           /* 🔒 ALTEZZA FISSA */
+  max-height: 600px;
 }
 
 /* ------------------------------
@@ -251,4 +251,39 @@ body {
 
 .controls button:active {
   transform: translateY(1px);
+}
+/* ===== WAYPOINT ITEM CLEAN ===== */
+
+.wp-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+/* Checkbox allineato bene */
+.wp-item input[type="checkbox"] {
+  margin-top: 4px;
+}
+
+/* Blocco testo */
+.wp-text {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Designator */
+.wp-designator {
+  font-weight: 600;
+  font-size: 14px;
+  color: #0c965f;
+  line-height: 1.2;
+}
+
+/* Coordinate compatte */
+.wp-coords {
+  font-size: 12px;
+  color: #374151;
+  white-space: nowrap;
+  line-height: 1.25;
 }

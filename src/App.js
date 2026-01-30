@@ -21,9 +21,9 @@ const waypointIcon = new L.Icon({
 // Dummy waypoint iniziali
 // --------------------
 const DUMMY_WAYPOINTS = [
-  { "@_gml:id": "uuid.TEST-1", _preview: { designator: "TEST1", lat: 41.8, lon: 12.25 } },
-  { "@_gml:id": "uuid.TEST-2", _preview: { designator: "TEST2", lat: 45.63, lon: 8.72 } },
-  { "@_gml:id": "uuid.TEST-3", _preview: { designator: "TEST3", lat: 44.5, lon: 11.3 } },
+  { id: "D1", _preview: { designator: "TEST1", lat: 41.8, lon: 12.25 } },
+  { id: "D2", _preview: { designator: "TEST2", lat: 45.63, lon: 8.72 } },
+  { id: "D3", _preview: { designator: "TEST3", lat: 44.5, lon: 11.3 } },
 ];
 
 function App() {
@@ -31,8 +31,9 @@ function App() {
   const [xmlJson, setXmlJson] = useState(null);
   const [waypoints, setWaypoints] = useState(DUMMY_WAYPOINTS);
   const [isDummy, setIsDummy] = useState(true);
-  const [visible, setVisible] = useState(new Set(DUMMY_WAYPOINTS.map((_, i) => i)));
+  const [visible, setVisible] = useState(new Set(DUMMY_WAYPOINTS.map(wp => wp.id)));
   const [searchTerm, setSearchTerm] = useState("");
+  const [mapKey, setMapKey] = useState(0);
   const mapRef = useRef(null);
 
   // --------------------
@@ -46,7 +47,7 @@ function App() {
     });
 
   // --------------------
-  // Decimali → DMS con 4 decimali
+  // Decimali → DMS
   // --------------------
   const toDMSLabel = (decimal, isLat) => {
     const dir = isLat ? (decimal >= 0 ? "N" : "S") : decimal >= 0 ? "E" : "W";
@@ -61,91 +62,89 @@ function App() {
   // --------------------
   // Estrazione waypoint
   // --------------------
-  const extractWaypoints = (json) => {
-    const root = json["message:AIXMBasicMessage"];
-    if (!root) return [];
+const extractWaypoints = (json) => {
+  const root = json["message:AIXMBasicMessage"];
+  if (!root) return [];
 
-    const membersRaw = root["message:hasMember"];
-    if (!membersRaw) return [];
+  const members = Array.isArray(root["message:hasMember"])
+    ? root["message:hasMember"]
+    : [root["message:hasMember"]];
 
-    const membersArray = Array.isArray(membersRaw) ? membersRaw : [membersRaw];
-    const previews = [];
+  const previews = [];
 
-    membersArray.forEach((m) => {
-      const dpRaw = m["aixm:DesignatedPoint"];
-      if (!dpRaw) return;
-      const dpArray = Array.isArray(dpRaw) ? dpRaw : [dpRaw];
+  members.forEach((m) => {
+    const dp = m?.["aixm:DesignatedPoint"];
+    if (!dp) return;
 
-      dpArray.forEach((point) => {
-        const timeSlices = point["aixm:timeSlice"]?.["aixm:DesignatedPointTimeSlice"];
-        if (!timeSlices) return;
-        const sliceArray = Array.isArray(timeSlices) ? timeSlices : [timeSlices];
+    const dpArray = Array.isArray(dp) ? dp : [dp];
 
-        sliceArray.forEach((s) => {
-          const posNode = s["aixm:location"]?.["aixm:Point"]?.["gml:pos"];
-          if (!posNode) return;
+    dpArray.forEach((point) => {
+      const slices = point?.["aixm:timeSlice"]?.["aixm:DesignatedPointTimeSlice"];
+      if (!slices) return;
 
-          const [lat, lon] = (posNode.__text || posNode).trim().split(" ").map(parseFloat);
+      const sliceArray = Array.isArray(slices) ? slices : [slices];
 
-          previews.push({
-            designator: s["aixm:designator"]?.__text || s["aixm:designator"] || "N/A",
-            lat,
-            lon,
-          });
+      sliceArray.forEach((s) => {
+        const pos = s?.["aixm:location"]?.["aixm:Point"]?.["gml:pos"];
+        if (!pos) return;
+
+        const [lat, lon] = (typeof pos === "string" ? pos : pos["#text"] || pos.__text)
+          .trim()
+          .split(" ")
+          .map(Number);
+
+        const rawDesignator = s["aixm:designator"];
+
+        const designator =
+          typeof rawDesignator === "string"
+            ? rawDesignator
+            : rawDesignator?.["#text"] || rawDesignator?.__text || "N/A";
+
+        previews.push({
+          id: crypto.randomUUID(),
+          designator,
+          lat,
+          lon,
         });
       });
     });
+  });
 
-    return previews;
-  };
+  return previews;
+};
+
 
   // --------------------
-  // Costruisce un AIXM 5.1 con solo i waypoint
+  // Costruisce AIXM con soli waypoint
   // --------------------
   const buildWaypointOnlyAIXM = (json) => {
     const root = json["message:AIXMBasicMessage"];
     if (!root) return null;
 
-    const membersRaw = root["message:hasMember"];
-    if (!membersRaw) return null;
+    const members = Array.isArray(root["message:hasMember"])
+      ? root["message:hasMember"]
+      : [root["message:hasMember"]];
 
-    const membersArray = Array.isArray(membersRaw) ? membersRaw : [membersRaw];
-
-    const waypointMembers = membersArray
+    const filteredMembers = members
       .map((m) => {
-        const dpRaw = m["aixm:DesignatedPoint"];
-        if (!dpRaw) return null;
+        const dp = m["aixm:DesignatedPoint"];
+        if (!dp) return null;
 
-        const dpArray = Array.isArray(dpRaw) ? dpRaw : [dpRaw];
-        const dpFiltered = dpArray
-          .map((point) => {
-            const timeSlices = point["aixm:timeSlice"]?.["aixm:DesignatedPointTimeSlice"];
-            if (!timeSlices) return null;
+        const dpArray = Array.isArray(dp) ? dp : [dp];
 
-            const sliceArray = Array.isArray(timeSlices) ? timeSlices : [timeSlices];
-            const validSlices = sliceArray.filter(
-              (s) => s["aixm:location"]?.["aixm:Point"]?.["gml:pos"]?.trim() !== ""
-            );
-
-            if (validSlices.length === 0) return null;
-
-            return {
-              ...point,
-              "@_gml:id": "uuid." + generateUUID(),
-              "aixm:timeSlice": { "aixm:DesignatedPointTimeSlice": validSlices },
-            };
-          })
-          .filter(Boolean);
-
-        if (dpFiltered.length === 0) return null;
-        return { "aixm:DesignatedPoint": dpFiltered };
+        return {
+          "aixm:DesignatedPoint": dpArray.map((p) => ({
+            ...p,
+            "@_gml:id": "uuid." + generateUUID(),
+          })),
+        };
       })
       .filter(Boolean);
 
     return {
       "message:AIXMBasicMessage": {
         ...root,
-        "message:hasMember": waypointMembers,
+        "message:hasMember": filteredMembers,
       },
     };
   };
@@ -157,67 +156,63 @@ function App() {
     const file = e.target.files[0];
     if (!file) return;
 
-    setXmlFile(file);
-
     const reader = new FileReader();
     reader.onload = () => {
-      const parser = new XMLParser({ ignoreAttributes: false, removeNSPrefix: false });
+      const parser = new XMLParser({ ignoreAttributes: false });
       const json = parser.parse(reader.result);
-      const previews = extractWaypoints(json);
 
-      if (previews.length === 0) {
+      const extracted = extractWaypoints(json);
+      if (extracted.length === 0) {
         alert("Nessun waypoint trovato!");
         return;
       }
 
-      setWaypoints(previews.map((p, i) => ({ "@_gml:id": `preview-${i}`, _preview: p })));
-      setVisible(new Set(previews.map((_, i) => i)));
-      setXmlJson(json);
-      setIsDummy(false);
+      const wp = extracted.map((p) => ({
+        id: p.id,
+        _preview: p,
+      }));
 
-      setTimeout(() => {
-        if (!mapRef.current) return;
-        const bounds = L.latLngBounds(previews.map((p) => [p.lat, p.lon]));
-        if (bounds.isValid()) mapRef.current.fitBounds(bounds, { padding: [40, 40] });
-      }, 100);
+      setXmlFile(file);
+      setXmlJson(json);
+      setWaypoints(wp);
+      setVisible(new Set(wp.map(w => w.id)));
+      setIsDummy(false);
+      setMapKey(k => k + 1);
     };
 
     reader.readAsText(file);
   };
 
   // --------------------
-  // Toggle visibilità mappa
+  // Toggle visibilità
   // --------------------
-  const toggleVisibility = (i) => {
-    setVisible((prev) => {
+  const toggleVisibility = (id) => {
+    setVisible(prev => {
       const next = new Set(prev);
-      next.has(i) ? next.delete(i) : next.add(i);
+      next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
   };
 
   const toggleAll = () => {
     if (visible.size === waypoints.length) setVisible(new Set());
-    else setVisible(new Set(waypoints.map((_, i) => i)));
+    else setVisible(new Set(waypoints.map(wp => wp.id)));
   };
 
   // --------------------
-  // Download XML waypoint solo
+  // Download XML waypoint
   // --------------------
   const handleDownloadWaypoints = () => {
-    if (!xmlFile || !xmlJson) return alert("Carica prima un file XML!");
+    if (!xmlJson || !xmlFile) return alert("Carica prima un file XML!");
 
-    const newXmlJson = buildWaypointOnlyAIXM(xmlJson);
-    if (!newXmlJson) return alert("Nessun waypoint trovato!");
+    const newJson = buildWaypointOnlyAIXM(xmlJson);
+    const builder = new XMLBuilder({ ignoreAttributes: false, format: true });
+    const xml = builder.build(newJson);
 
-    const builder = new XMLBuilder({ ignoreAttributes: false, format: true, suppressEmptyNode: true });
-    const newXml = builder.build(newXmlJson);
-
-    const originalName = xmlFile.name.replace(/\.xml$/i, "");
-    const blob = new Blob([newXml], { type: "application/xml" });
+    const blob = new Blob([xml], { type: "application/xml" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `${originalName}_waypoints_only.xml`;
+    link.download = xmlFile.name.replace(/\.xml$/i, "") + "_waypoints.xml";
     link.click();
   };
 
@@ -225,10 +220,8 @@ function App() {
   // Download CSV
   // --------------------
   const handleDownloadCSV = () => {
-    if (!waypoints || waypoints.length === 0) return alert("Nessun waypoint disponibile per l'estrazione CSV!");
-
     const headers = ["Designator", "Lat", "Lon", "Lat DMS", "Lon DMS"];
-    const rows = waypoints.map((wp) => [
+    const rows = waypoints.map(wp => [
       wp._preview.designator,
       wp._preview.lat,
       wp._preview.lon,
@@ -236,49 +229,17 @@ function App() {
       toDMSLabel(wp._preview.lon, false),
     ]);
 
-    const csvContent = [headers, ...rows].map((e) => e.join(",")).join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
     const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.href = url;
+    link.href = URL.createObjectURL(blob);
     link.download = "waypoints.csv";
     link.click();
-    URL.revokeObjectURL(url);
   };
 
-  // --------------------
-  // Filtra lista waypoint in base alla search
-  // --------------------
-  const filteredWaypoints = waypoints.filter((wp) =>
+  const filteredWaypoints = waypoints.filter(wp =>
     wp._preview.designator.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  useEffect(() => {
-    const newVisible = new Set(filteredWaypoints.map((_, i) => i));
-    setVisible(newVisible);
-  }, [searchTerm, waypoints]);
-
-  // Fit bounds automatico
-  useEffect(() => {
-    if (!mapRef.current || visible.size === 0) return;
-
-    const visibleWaypoints = waypoints
-      .filter((_, i) => visible.has(i))
-      .map((wp) => [wp._preview.lat, wp._preview.lon]);
-
-    if (visibleWaypoints.length === 0) return;
-
-    const bounds = L.latLngBounds(visibleWaypoints);
-    if (bounds.isValid()) mapRef.current.fitBounds(bounds, { padding: [40, 40] });
-  }, [waypoints, visible]);
-
-  // Fix Leaflet resize
-  useEffect(() => {
-    const handleResize = () => mapRef.current?.invalidateSize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   return (
     <div className="app-container">
@@ -292,45 +253,43 @@ function App() {
 
       <div className="waypoint-map-container">
         <div className="waypoint-list">
-          <h2>
-            Waypoint {isDummy ? "di esempio" : "estratti"} ({waypoints.length})
-          </h2>
+          <h2>Waypoint ({waypoints.length})</h2>
 
           <input
             type="text"
             placeholder="Cerca waypoint..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              padding: "8px 10px",
-              borderRadius: "6px",
-              border: "1px solid #d1d5db",
-              marginBottom: "12px",
-              width: "100%",
-              fontSize: "14px",
-            }}
           />
 
           <label>
             <input
               type="checkbox"
-              checked={visible.size === filteredWaypoints.length}
+              checked={visible.size === waypoints.length}
               onChange={toggleAll}
             />{" "}
-            Mostra/Nascondi tutti sulla mappa
+            Mostra/Nascondi tutti
           </label>
 
           <ul>
-            {filteredWaypoints.map((wp, i) => (
-              <li key={i}>
-                <label>
+            {filteredWaypoints.map(wp => (
+              <li key={wp.id}>
+                <label className="wp-item">
                   <input
                     type="checkbox"
-                    checked={visible.has(i)}
-                    onChange={() => toggleVisibility(i)}
-                  />{" "}
-                  <strong>{wp._preview.designator}</strong> –{" "}
-                  {toDMSLabel(wp._preview.lat, true)}, {toDMSLabel(wp._preview.lon, false)}
+                    checked={visible.has(wp.id)}
+                    onChange={() => toggleVisibility(wp.id)}
+                  />
+
+                  <div className="wp-text">
+                    <div className="wp-designator">
+                      {wp._preview.designator}
+                    </div>
+
+                    <div className="wp-coords">
+                      {toDMSLabel(wp._preview.lat, true)} — {toDMSLabel(wp._preview.lon, false)}
+                    </div>
+                  </div>
                 </label>
               </li>
             ))}
@@ -339,6 +298,7 @@ function App() {
 
         <div className="waypoint-map">
           <MapContainer
+            key={mapKey}
             whenCreated={(map) => (mapRef.current = map)}
             center={[waypoints[0]._preview.lat, waypoints[0]._preview.lon]}
             zoom={6}
@@ -346,16 +306,22 @@ function App() {
           >
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             {waypoints
-              .filter((_, i) => visible.has(i))
-              .map((wp, i) => (
-                <Marker key={i} position={[wp._preview.lat, wp._preview.lon]} icon={waypointIcon}>
-                  <Popup>
-                    <strong>{wp._preview.designator}</strong>
-                    <br />
-                    {toDMSLabel(wp._preview.lat, true)}
-                    <br />
+              .filter(wp => visible.has(wp.id))
+              .map(wp => (
+                <Marker
+                  key={wp.id}
+                  position={[wp._preview.lat, wp._preview.lon]}
+                  icon={waypointIcon}
+                >
+                <Popup>
+                  <strong>{wp._preview.designator}</strong>
+                  <div className="wp-coords">
+                    {toDMSLabel(wp._preview.lat, true)} 
+                    <br/>
                     {toDMSLabel(wp._preview.lon, false)}
-                  </Popup>
+                  </div>
+                </Popup>
+
                 </Marker>
               ))}
           </MapContainer>

@@ -7,7 +7,7 @@ function Footer() {
       <div className="footer-content">
         <div className="footer-left">
           <strong>AIXM Waypoint Extractor</strong>
-          <span>Tool per preview e filtering AIXM 5.1</span>
+          <span>Tool per preview e filtering AIXM 5.1 - v0.3</span>
         </div>
 
         <div className="footer-right">
