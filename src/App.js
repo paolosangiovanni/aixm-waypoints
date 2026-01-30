@@ -5,17 +5,25 @@ import "leaflet/dist/leaflet.css";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import Footer from "./components/Footer";
-
+import MeasureTool from "./components/MeasureTool";
 // --------------------
 // Icona waypoint
 // --------------------
 const waypointIcon = new L.Icon({
   iconUrl:
-    "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2l0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBkPSJNMTIgNS44ODdsOC40NjggMTQuMTEzaC0xNi45MzZsOC40NjgtMTQuMTEzem0wLTMuODg3bC0xMiAyMGgyNGwtMTItMjB6Ii8+PC9zdmc+",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
+    "data:image/svg+xml;base64," +
+    btoa(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+        <polygon points="12,0 24,20 0,20" fill="#fff" stroke="#000" stroke-width="1"/>
+      </svg>
+    `),
+  iconSize: [24, 24],       // dimensioni SVG
+  iconAnchor: [12, 20],     // punta triangolo al centro basso
+  popupAnchor: [0, -24],    // popup sopra la punta
 });
+
+
+
 
 // --------------------
 // Dummy waypoint iniziali
@@ -299,7 +307,10 @@ const extractWaypoints = (json) => {
         <div className="waypoint-map">
           <MapContainer
             key={mapKey}
-            whenCreated={(map) => (mapRef.current = map)}
+            whenCreated={(map) => {
+            mapRef.current = map;
+          }}
+
             center={[waypoints[0]._preview.lat, waypoints[0]._preview.lon]}
             zoom={6}
             className="leaflet-container"
@@ -324,10 +335,10 @@ const extractWaypoints = (json) => {
 
                 </Marker>
               ))}
+              <MeasureTool waypoints={waypoints} />
           </MapContainer>
         </div>
       </div>
-
       <Footer />
     </div>
   );
