@@ -1,10 +1,11 @@
-import React, { useState, useRef, useEffect } from "react";
-import { XMLParser, XMLBuilder } from "fast-xml-parser";
+import React, { useState } from "react";
+import { XMLParser } from "fast-xml-parser";
 import "./App.css";
 import "leaflet/dist/leaflet.css";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import Footer from "./components/Footer";
+import MigrationModal from "./components/MigrationModal";
 import MeasureTool from "./components/MeasureTool";
 // --------------------
 // Icona waypoint
@@ -35,24 +36,11 @@ const DUMMY_WAYPOINTS = [
 ];
 
 function App() {
-  const [xmlFile, setXmlFile] = useState(null);
-  const [xmlJson, setXmlJson] = useState(null);
   const [waypoints, setWaypoints] = useState(DUMMY_WAYPOINTS);
-  const [isDummy, setIsDummy] = useState(true);
   const [visible, setVisible] = useState(new Set(DUMMY_WAYPOINTS.map(wp => wp.id)));
   const [searchTerm, setSearchTerm] = useState("");
   const [mapKey, setMapKey] = useState(0);
-  const mapRef = useRef(null);
-
-  // --------------------
-  // UUID generator
-  // --------------------
-  const generateUUID = () =>
-    "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === "x" ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
+  const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
 
   // --------------------
   // Decimali → DMS
@@ -121,42 +109,6 @@ const extractWaypoints = (json) => {
   return previews;
 };
 
-
-  // --------------------
-  // Costruisce AIXM con soli waypoint
-  // --------------------
-  const buildWaypointOnlyAIXM = (json) => {
-    const root = json["message:AIXMBasicMessage"];
-    if (!root) return null;
-
-    const members = Array.isArray(root["message:hasMember"])
-      ? root["message:hasMember"]
-      : [root["message:hasMember"]];
-
-    const filteredMembers = members
-      .map((m) => {
-        const dp = m["aixm:DesignatedPoint"];
-        if (!dp) return null;
-
-        const dpArray = Array.isArray(dp) ? dp : [dp];
-
-        return {
-          "aixm:DesignatedPoint": dpArray.map((p) => ({
-            ...p,
-            "@_gml:id": "uuid." + generateUUID(),
-          })),
-        };
-      })
-      .filter(Boolean);
-
-    return {
-      "message:AIXMBasicMessage": {
-        ...root,
-        "message:hasMember": filteredMembers,
-      },
-    };
-  };
-
   // --------------------
   // Upload XML
   // --------------------
@@ -180,11 +132,8 @@ const extractWaypoints = (json) => {
         _preview: p,
       }));
 
-      setXmlFile(file);
-      setXmlJson(json);
       setWaypoints(wp);
       setVisible(new Set(wp.map(w => w.id)));
-      setIsDummy(false);
       setMapKey(k => k + 1);
     };
 
@@ -211,38 +160,14 @@ const extractWaypoints = (json) => {
   // Download XML waypoint
   // --------------------
   const handleDownloadWaypoints = () => {
-    if (!xmlJson || !xmlFile) return alert("Carica prima un file XML!");
-
-    const newJson = buildWaypointOnlyAIXM(xmlJson);
-    const builder = new XMLBuilder({ ignoreAttributes: false, format: true });
-    const xml = builder.build(newJson);
-
-    const blob = new Blob([xml], { type: "application/xml" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = xmlFile.name.replace(/\.xml$/i, "") + "_waypoints.xml";
-    link.click();
+    setIsMigrationModalOpen(true);
   };
 
   // --------------------
   // Download CSV
   // --------------------
   const handleDownloadCSV = () => {
-    const headers = ["Designator", "Lat", "Lon", "Lat DMS", "Lon DMS"];
-    const rows = waypoints.map(wp => [
-      wp._preview.designator,
-      wp._preview.lat,
-      wp._preview.lon,
-      toDMSLabel(wp._preview.lat, true),
-      toDMSLabel(wp._preview.lon, false),
-    ]);
-
-    const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "waypoints.csv";
-    link.click();
+    setIsMigrationModalOpen(true);
   };
 
   const filteredWaypoints = waypoints.filter(wp =>
@@ -307,10 +232,6 @@ const extractWaypoints = (json) => {
         <div className="waypoint-map">
           <MapContainer
             key={mapKey}
-            whenCreated={(map) => {
-            mapRef.current = map;
-          }}
-
             center={[waypoints[0]._preview.lat, waypoints[0]._preview.lon]}
             zoom={6}
             className="leaflet-container"
@@ -339,6 +260,10 @@ const extractWaypoints = (json) => {
           </MapContainer>
         </div>
       </div>
+      <MigrationModal
+        isOpen={isMigrationModalOpen}
+        onClose={() => setIsMigrationModalOpen(false)}
+      />
       <Footer />
     </div>
   );

@@ -1,0 +1,111 @@
+.migration-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(3px);
+}
+
+.migration-modal {
+  position: relative;
+  width: min(100%, 520px);
+  padding: 28px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #ffffff 0%, #f4fbf7 100%);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+  color: #1f2933;
+}
+
+.migration-modal-kicker {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0c965f;
+}
+
+.migration-modal h2 {
+  margin-bottom: 12px;
+  font-size: 28px;
+  line-height: 1.1;
+  color: #0f172a;
+}
+
+.migration-modal p {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #475569;
+}
+
+.migration-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.migration-modal-primary,
+.migration-modal-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.migration-modal-primary {
+  background: #0c965f;
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(12, 150, 95, 0.25);
+}
+
+.migration-modal-secondary {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+}
+
+.migration-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #0f172a;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .migration-modal {
+    padding: 22px;
+    border-radius: 16px;
+  }
+
+  .migration-modal h2 {
+    font-size: 24px;
+  }
+
+  .migration-modal-actions {
+    flex-direction: column;
+  }
+
+  .migration-modal-primary,
+  .migration-modal-secondary {
+    width: 100%;
+  }
+}
