@@ -4,7 +4,7 @@ export default function MigrationModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   const handleRedirect = () => {
-    window.location.href = "https://aviondir.com";
+    window.location.href = "https://aviondir.com/demo";
   };
 
   return (
