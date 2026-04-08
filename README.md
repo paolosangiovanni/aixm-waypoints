@@ -50,3 +50,18 @@ Run the app locally:
 npm start
 ```
 
+## GitHub Pages deploy
+
+The project is configured for GitHub Pages through the `homepage` field in `package.json`.
+
+Deploy the current build with:
+
+```bash
+npm run deploy
+```
+
+You can also use the explicit alias:
+
+```bash
+npm run deploy:gh-pages
+```
